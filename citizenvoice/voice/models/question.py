@@ -4,8 +4,6 @@ by Pierre Sassoulas, 2022, version 1.4.0.
 Available at https://github.com/Pierre-Sassoulas/django-survey
 """
 
-import django.contrib.gis.db.models
-
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from .survey import Survey
@@ -22,17 +20,16 @@ class Question(models.Model):
     captured in a comma-separated text field.
     """
 
-    # TODO: [manuel] consider using enum for this
     TEXT = "text"
     SHORT_TEXT = "short-text"
     RADIO = "radio"
     SELECT = "select"
-    SELECT_IMAGE = "select_image"
     SELECT_MULTIPLE = "select-multiple"
     INTEGER = "integer"
     FLOAT = "float"
     DATE = "date"
     IMAGE_UPLOAD = "image-upload"
+    LIKERT_SCALE = "likert-scale"
 
     QUESTION_TYPES = (
         (TEXT, _("text (multiple line)")),  # syntax (value, label)
@@ -40,11 +37,11 @@ class Question(models.Model):
         (RADIO, _("radio")),
         (SELECT, _("select")),
         (SELECT_MULTIPLE, _("Select Multiple")),
-        (SELECT_IMAGE, _("Select Image")),
         (INTEGER, _("integer")),
         (FLOAT, _("float")),
         (DATE, _("date")),
-        (IMAGE_UPLOAD, _("Image Upload")),
+        (IMAGE_UPLOAD, _("image upload")),
+        (LIKERT_SCALE, _("likert scale")),
     )
 
     text = models.TextField(_("Question"))
@@ -68,6 +65,13 @@ class Question(models.Model):
     topics = models.ManyToManyField(
         DashboardTopic, verbose_name=_("Topics"), blank=True
     )
+    likert_config = models.JSONField(
+        _("Likert Scale configuration"),
+        blank=True,
+        null=True,
+        help_text=_("JSON configuration for Likert scale labels and values"),
+        default=dict,
+    )
 
     objects = BulkUpdateOrCreateQuerySet.as_manager()
 
@@ -81,3 +85,28 @@ class Question(models.Model):
 
     def question_count(self):
         return self.question_set.count()
+
+    def get_default_likert_config(self):
+        """
+        Returns default 5-point customer satisfaction likert scale configuration.
+        """
+        return {
+            "scale_points": 5,
+            "labels": {
+                "1": _("Very Dissatisfied"),
+                "2": _("Dissatisfied"),
+                "3": _("Neither satisfied nor dissatisfied"),
+                "4": _("Satisfied"),
+                "5": _("Very Satisfied"),
+            },
+            "left_anchor": _("Very Dissatisfied"),
+            "right_anchor": _("Very Satisfied"),
+        }
+
+    def get_likert_config(self):
+        """
+        Returns the likert configuration, or the default if not set.
+        """
+        if self.question_type == self.LIKERT_SCALE and self.likert_config:
+            return self.likert_config
+        return self.get_default_likert_config()

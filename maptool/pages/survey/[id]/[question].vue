@@ -68,7 +68,7 @@
                     <RespondentViewQuestionTypesAnswerTypeLikertScale
                     v-if="question.question_type === 'likert-scale'"
                     :question="question"
-                    :answer="answer"
+                    :answer="current_answer"
                     :question_index="current_question_index"
                     @update-answer="handleUpdateAnswer"
                     />
@@ -112,10 +112,9 @@ import { useSurveyStore } from "~/stores/survey";
 import { useResponseStore } from '~/stores/response';
 import { useMapViewStore } from "~/stores/mapview";
 import { useGlobalStore } from "~/stores/global";
-
+import { resetSurveySession } from "~/stores/utils/storeReset";
 // import leaflet from "leaflet"
 import "leaflet/dist/leaflet.css";
-import { LMap, LTileLayer, LCircle, LControl } from "@vue-leaflet/vue-leaflet";
 
 const responseStore = useResponseStore();
 const mapViewStore = useMapViewStore();
@@ -124,12 +123,38 @@ mapViewStore.$reset();
 
 const route = useRoute();
 const survey_store = useSurveyStore();
+
+// Ensure correct survey is selected for direct navigation to question pages
+survey_store.selectSurvey(route.params.id);
+
+// Load questions if not already loaded for this survey
+if (!survey_store.questions.length || survey_store.selectedSurveyId !== route.params.id) {
+    await survey_store.getQuestionsOfSurvey();
+}
+
 const questions = survey_store.questions;
+
+// Handle case where questions couldn't be loaded
+if (!questions || questions.length === 0) {
+    throw createError({
+        statusCode: 404,
+        statusMessage: 'Survey questions not found. Please go back to the survey start page.'
+    });
+}
 
 // Here, we use the list of questions in the survey store to display questions according to the order
 // specified when the survey was created. We use the numbers in the URL to navigate between questions
 // while maintaining the order of the questions in the survey store. 
 var current_question_index = parseInt(route.params.question, 10); // use url questions id as an index to load each question 
+
+// Validate question index
+if (current_question_index < 1 || current_question_index > questions.length) {
+    throw createError({
+        statusCode: 404,
+        statusMessage: 'Question not found in this survey.'
+    });
+}
+
 let current_question_url = questions[current_question_index - 1].url;  // gets the id for the questions
 let current_mapview_id = questions[current_question_index - 1].mapview;  // gets the value for the map view
 let question = questions[current_question_index - 1];
@@ -145,10 +170,10 @@ const handleUpdateAnswer = (updatedAnswer, questionIndex) =>{
     current_answer.question_index = questionIndex;
     const current_mapview = mapViewStore.getMapViewAnswer;
     current_answer.mapview = current_mapview;
+    
+    // This will automatically create response if it doesn't exist yet
     responseStore.updateAnswer(updatedAnswer);
-    };
-
-
+};
 const circles = ref([]) // this is what user will add
 let circleClickedAndRemoved = false
 let resetClicked = false
@@ -174,21 +199,38 @@ const submitAnswers = async () => {
     
     const global = useGlobalStore();
 
-    for (let i = 0; i < responseStore.answers.length; i++) {
-        let response_url = responseStore.responseUrl;
-        let question_url = responseStore.answers[i].question_url;
-        let mapview_url = responseStore.answers[i].mapview.url;
-        const answer_text = responseStore.answers[i].text;
-        responseStore.submitAnswer(
-            response_url,
-            question_url,
-            answer_text,
-            mapview_url
-        )
+    try {
+
+        for (let i = 0; i < responseStore.answers.length; i++) {
+            let response_url = responseStore.responseUrl;
+            let question_url = responseStore.answers[i].question_url;
+            
+            // Fix: Safely extract mapview URL
+            let mapview_url = null;
+            if (responseStore.answers[i].mapview && responseStore.answers[i].mapview.url) {
+                mapview_url = responseStore.answers[i].mapview.url;
+            }
+            
+            console.log("Submitting answer with mapview " + mapview_url);
+            const answer_text = responseStore.answers[i].text;
+            await responseStore.submitAnswer(
+                response_url,
+                question_url,
+                answer_text,
+                mapview_url
+            )
+        }
+
+        // Clear the store after submission
+        resetSurveySession();
+
+        global.succes("Your answers have been submitted")
+        return navigateTo('/submitted/')
+
+    } catch (error) {
+        console.error("Error submitting answers:", error);
+        global.error("There was an error submitting your answers. Please try again.")
     }
-    global.succes("Your answers have been submitted")
-    return navigateTo('/submitted/')
-    
 };
 
 // inspired by Roy J's solution on Stack Overflow:

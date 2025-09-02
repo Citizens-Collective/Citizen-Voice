@@ -58,9 +58,6 @@ import { th } from "vuetify/locale";
 
 // API endpoints
 const map_views_endpoint = '/map-views/'
-
-const questionStore = useQuestionDesignStore()
-
 const answerMapViewStore = useAnswerMapViewStore()
 const responseStore = useResponseStore()
 answerMapViewStore.$reset()
@@ -280,7 +277,10 @@ const onMapWWControlReady = () => {
                 const latlng = layer.getLatLng();
                 const geojsonFeature = {
                     type: 'Feature',
-                    properties: { radius: radius },
+                    properties: { 
+                        radius: radius,
+                        annotation: '' // Add annotation property
+                    },
                     geometry: { type: 'Point', coordinates: [latlng.lng, latlng.lat] },
                 };
                 const circleLayer = L.geoJSON(geojsonFeature, {
@@ -288,6 +288,7 @@ const onMapWWControlReady = () => {
                         return L.circle(latlng, { radius: feature.properties.radius });
                     },
                 });
+                circleLayer.feature = geojsonFeature; // Ensure feature is accessible
                 drawnItemsRef.value.addLayer(circleLayer);
             } else {                
                 drawnItemsRef.value.addLayer(layer); 
@@ -312,18 +313,36 @@ const onMapWWControlReady = () => {
             saveButton.style.borderRadius = '5px'; 
             saveButton.style.marginTop = '10px'; 
             saveButton.onclick = () => {
-                // console.log('layer value //> ', input.value)
-                handleSaveDescription(input.value);
-                // TODO: check if options are saved to the map view
-                // event.layer.properties.description = input.value;    
-                // drawnItemsRef.value.addLayer(event.layer);
-
-                // console.log('drawItems ref //> ', drawnItemsRef.value);
-                // event.layer.bindPopup(input.value, closeButton = true);
-                // console.log('event layer  //> ', event.layer);
-                // TODO: Fix. save the description to the layer
-
-                // layer.properties = { description: input.value };
+                const description = input.value;
+                
+                // Save description to layer properties as annotation
+                if (layerType === 'circle') {
+                    // For circles, update the geojsonFeature that was created
+                    const circleLayers = drawnItemsRef.value.getLayers();
+                    const circleLayer = circleLayers[circleLayers.length - 1]; // Get the last added layer (current circle)
+                    if (circleLayer && circleLayer.feature) {
+                        circleLayer.feature.properties.annotation = description;
+                    }
+                } else {
+                    // For other geometries, add properties to the layer
+                    if (!layer.feature) {
+                        layer.feature = {
+                            type: 'Feature',
+                            properties: {},
+                            geometry: layer.toGeoJSON().geometry
+                        };
+                    }
+                    layer.feature.properties.annotation = description;
+                }
+                
+                // Update the popup to show the saved description
+                layer.closePopup();
+                layer.bindPopup(description);
+                
+                // Update geometries in store AFTER description is saved
+                answerMapViewStore.updateGeometries(drawnItemsRef.value.toGeoJSON());
+                
+                handleSaveDescription(description);
             };
 
             popupContent.appendChild(input);
@@ -331,11 +350,7 @@ const onMapWWControlReady = () => {
 
             layer.bindPopup(popupContent);
             
-                    //   
-            
-            // console.log('drawnItemsRef.value  add //> ', drawnItemsRef.value.toGeoJSON())
-
-            answerMapViewStore.updateGeometries(drawnItemsRef.value.toGeoJSON());
+            // Note: geometries will be updated when description is saved, not immediately
         });
 
         map.on(L.Draw.Event.DELETED, (event) => {
@@ -365,13 +380,30 @@ const onMapWWControlReady = () => {
 
 const current_question_id = route.params.question
 const suveryStore = useSurveyStore()
-const current_question_url = suveryStore.questions[current_question_id-1].url
 
-// CONTINUE HERE
-/// TODO: check why a new answer is created in response store when  text is updated, after map is saved
+// Ensure we have the questions loaded and current_question_id is valid
+let current_question_url = null;
+if (suveryStore.questions && suveryStore.questions.length > 0) {
+    const questionIndex = parseInt(current_question_id) - 1;
+    if (questionIndex >= 0 && questionIndex < suveryStore.questions.length) {
+        current_question_url = suveryStore.questions[questionIndex].url;
+    } else {
+        console.error('Invalid question index:', questionIndex, 'Available questions:', suveryStore.questions.length);
+    }
+} else {
+    console.error('Survey questions not loaded or empty:', suveryStore.questions);
+}
 
 
 const submitMap = async () => {
+    // Check if we have a valid question URL before proceeding
+    if (!current_question_url) {
+        console.error('Cannot save map: current_question_url is not available');
+        const global = useGlobalStore();
+        global.warning('Cannot save map: question information not available');
+        return;
+    }
+
     // const global = useGlobalStore()
     let response
     // mapViewAnswerData.geometries = drawnItemsRef.value.toGeoJSON()

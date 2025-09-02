@@ -193,8 +193,11 @@ class QuestionViewSet(viewsets.ModelViewSet, UpdateModelMixin):
         data = request.data if isinstance(request.data, list) else [request.data]
         questions = []
         """
-        Here we iterate over each item in the list and checks if it has an 'id' field. If it does, it retrieves the existing Question object with that ID (if it exists). If it doesn't have an 'id' field, it creates a new Question object.
+        Here we iterate over each item in the list and checks if it has an 'id' field. If it does, 
+        it retrieves the existing Question object with that ID (if it exists). 
+        If it doesn't have an 'id' field, it creates a new Question object.
         """
+
         for question_data in data:
             if "id" in question_data:
                 question = Question.objects.filter(pk=question_data["id"]).first()
@@ -224,13 +227,9 @@ class QuestionViewSet(viewsets.ModelViewSet, UpdateModelMixin):
             "survey",
             "is_geospatial",
             "has_text_input",
-            "map_view",
+            "mapview",
+            "topics",
         ]
-
-        # update or create multiple questions in bulk
-        Question.objects.bulk_update_or_create(
-            questions, update_fields, match_field="id"
-        )
 
         serializer = self.get_serializer(questions, many=True)
         headers = self.get_success_headers(serializer.data)

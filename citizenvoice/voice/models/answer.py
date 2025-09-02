@@ -51,6 +51,17 @@ class Answer(models.Model):
         """Return answer values based on question type."""
         if self.question.question_type == Question.IMAGE_UPLOAD and self.image:
             return [self.image.url]
+        elif self.question.question_type == Question.LIKERT_SCALE and self.body:
+            # Return both numeric and text values for Likert scale
+            try:
+                likert_value = int(self.body)
+                config = self.question.get_likert_config()
+                label = config.get("labels", {}).get(
+                    str(likert_value), f"Point {likert_value}"
+                )
+                return [{"value": likert_value, "label": label}]
+            except (ValueError, TypeError):
+                return [self.body]
         elif self.body:
             # For multiple choice questions, split by comma
             if self.question.question_type in [Question.SELECT_MULTIPLE]:
@@ -58,7 +69,19 @@ class Answer(models.Model):
             return [self.body]
         return []
 
-    # TODO: [manuel] Shall we define types for answers?
+    def get_likert_display(self):
+        """Get human-readable display for Likert scale answers."""
+        if self.question.question_type == Question.LIKERT_SCALE and self.body:
+            try:
+                likert_value = int(self.body)
+                config = self.question.get_likert_config()
+                label = config.get("labels", {}).get(
+                    str(likert_value), f"Point {likert_value}"
+                )
+                return f"{likert_value} - {label}"
+            except (ValueError, TypeError):
+                return self.body
+        return self.body
 
     def __str__(self):
         if self.image:

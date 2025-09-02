@@ -34,16 +34,17 @@ class TopicSerializer(serializers.ModelSerializer):
 
 class QuestionSerializer(serializers.HyperlinkedModelSerializer):
     """
-    Serializes 'text', 'order', 'required', 'question_type', 'choices', 'is_geospatial', 'map_view'
+    Serializes 'text', 'order', 'required', 'question_type', 'choices', 'is_geospatial', 'map_view', 'likert_config'
     fields of the Question model for the API.
     """
 
     survey = serializers.HyperlinkedRelatedField(
-        view_name="survey-detail", read_only=True
+        queryset=Survey.objects.all(), view_name="survey-detail"
     )
     topics = serializers.HyperlinkedRelatedField(
         view_name="topics-detail", read_only=True, many=True
     )
+    likert_config = serializers.JSONField(required=False, allow_null=True)
 
     class Meta:
         model = Question
@@ -61,8 +62,52 @@ class QuestionSerializer(serializers.HyperlinkedModelSerializer):
             "is_geospatial",
             "mapview",
             "topics",
+            "likert_config",
         )
         read_only_fields = ("id", "url")
+
+    def validate_likert_config(self, value):
+        """
+        Validate Likert scale configuration.
+        Ensure it contains required fields.
+        """
+        if not value:
+            return value
+
+        required_fields = ["scale_points", "labels"]
+        for field in required_fields:
+            if field not in value:
+                raise serializers.ValidationError(f"Missing required field: '{field}'")
+
+        # Validate scale points
+        scale_points = value.get("scale_points")
+        if not isinstance(scale_points, int) or scale_points < 2 or scale_points > 10:
+            raise serializers.ValidationError(
+                "Scale points must be an integer between 2 and 10."
+            )
+
+        # Validate labels
+        labels = value.get("labels", {})
+        if not isinstance(labels, dict):
+            raise serializers.ValidationError("Labels must be a dictionary")
+
+        # Check there are labels for all scale points
+        for i in range(1, scale_points + 1):
+            if str(i) not in labels:
+                raise serializers.ValidationError(f"Missing label for scale point {i}.")
+
+        return value
+
+    def validate(self, attrs):
+        """Validate question data."""
+        question_type = attrs.get("question_type")
+        likert_config = attrs.get("likert_config")
+
+        if question_type == Question.LIKERT_SCALE and not likert_config:
+            # Set default Likert scale configuration if not provided
+            attrs["likert_config"] = Question().get_default_likert_config()
+
+        return attrs
 
     def create(self, validated_data):
         question = Question.objects.create(
@@ -75,6 +120,7 @@ class QuestionSerializer(serializers.HyperlinkedModelSerializer):
             is_geospatial=validated_data.get("is_geospatial", False),
             has_text_input=validated_data.get("has_text_input", True),
             mapview=validated_data.get("mapview", None),
+            likert_config=validated_data.get("likert_config", None),
         )
         return question
 
@@ -325,6 +371,12 @@ class AnswerSerializer(serializers.HyperlinkedModelSerializer):
     question = serializers.HyperlinkedRelatedField(
         queryset=Question.objects.all(), view_name="question-detail"
     )
+    mapview = serializers.HyperlinkedRelatedField(
+        queryset=MapView.objects.all(),
+        view_name="mapview-detail",
+        required=False,
+        allow_null=True,
+    )
     image = serializers.ImageField(required=False, allow_null=True)
 
     class Meta:
@@ -336,6 +388,7 @@ class AnswerSerializer(serializers.HyperlinkedModelSerializer):
             "updated",
             "body",
             "image",
+            "mapview",
             "question",
             "response",
         )
@@ -361,18 +414,39 @@ class AnswerSerializer(serializers.HyperlinkedModelSerializer):
         return value
 
     def validate(self, attrs):
-        """Ensure image is provided for image upload questions."""
+        """Ensure image is provided for image upload questions and validate Likert responses."""
         question = attrs.get("question")
-        if (
-            question and question.question_type == "image-upload"
-        ):  # Use your actual IMAGE_UPLOAD constant
-            if not attrs.get("image") and not attrs.get("body"):
-                raise serializers.ValidationError(
-                    "Image is required for image upload questions."
-                )
+        body = attrs.get("body")
+
+        if question:
+            if question.question_type == Question.IMAGE_UPLOAD:
+                if not attrs.get("image") and not body:
+                    raise serializers.ValidationError(
+                        "An image is required for image-upload questions."
+                    )
+            elif question.question_type == Question.LIKERT_SCALE:
+                if not body:
+                    raise serializers.ValidationError(
+                        "A response is required for Likert scale questions."
+                    )
+                try:
+                    likert_value = int(body)
+                    config = question.get_likert_config()
+                    scale_points = config.get("scale_points", 5)
+                    if likert_value < 1 or likert_value > scale_points:
+                        raise serializers.ValidationError(
+                            f"Likert response must be between 1 and {scale_points}."
+                        )
+                except ValueError:
+                    raise serializers.ValidationError(
+                        "Likert response must be a valid integer."
+                    )
         return attrs
 
     def create(self, validated_data):
+        # Add debugging
+        print(f"Validated data: {validated_data}")
+        print(f"Mapview in validated_data: {validated_data.get('mapview')}")
         response = Answer.objects.create(**validated_data)
         return response
 
