@@ -5,20 +5,19 @@ import setRequestConfig from './utils/setRequestConfig';
 
 
 export const useAnswerStore = defineStore('answer', {
-
-    state: () =>
-    // required data for the response store
-    // responseId // if null it means that the respondent 
-    // respondent
-    // currentQuestion
-    // surveyId
-    // answersToCurrentSurvey
-    {
-        return {
+    
+    state: () => 
+        // required data for the response store
+        // responseId // if null it means that the respondent 
+        // respondent
+        // currentQuestion
+        // surveyId
+        // answersToCurrentSurvey
+       { 
+        return { 
             question_index: null,
             body: ""
-        }
-    },
+        } },
     getters: {
 
     },
@@ -37,9 +36,9 @@ export const useAnswerStore = defineStore('answer', {
             else {
                 this.answers.push(answer);
             }
-
+    
         },
-
+        
         clearAnswers() {
             // Clear all the answers
             this.answers = []
@@ -50,35 +49,33 @@ export const useAnswerStore = defineStore('answer', {
             const csrftoken = user.getCookie('csrftoken');
             const token = user.getAuthToken;
 
-            // Create FormData instead of JSON
-            const formData = new FormData();
-            formData.append('response', response_url);
-            formData.append('question', question_url);
-            formData.append('body', answer_value);
-
             const config = {
-                headers: {
-                    // Remove Content-Type to let browser set it automatically for FormData
+                headers : {
+                    'Content-Type': 'application/json',
                     'X-CSRFToken': csrftoken,
                 },
                 method: 'POST',
                 // pas the data for the new Response object as the request body
-
+                
                 // TODO: have the repondent set to the logged in user 
-                body: formData  // Use FormData instead of JSON
+                body: {
+                    response: response_url,
+                    question: question_url,
+                    body: answer_value
+                }
             };
             if (token) {
                 config.headers['Authorization'] = `Token ${token}`
             };
 
-            const { data: response, pending, error } = await useAsyncData('submitAnswer', () => $cmsApi('/answers/', config));
+            const {data: response, pending, error} = await useAsyncData('submitAnswer', () => $cmsApi('/api/answers/', config));
 
             if (response) {
                 console.log('response submitted //> ');
             }
-
+        
         }
 
-
+       
     }
 })

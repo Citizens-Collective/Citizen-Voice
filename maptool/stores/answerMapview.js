@@ -31,22 +31,9 @@ export const useAnswerMapViewStore = defineStore('answerMapView', {
             return {
                 url: state.url,
                 location: state.location
-            }
-        }
+        }}
     },
     actions: {
-
-        $reset() {
-            this.id = null
-            this.url = null
-            this.name = null
-            this.description = ''
-            this.location = null
-            this.mapServiceUrl = null
-            this.zoomLevel = null
-            this.center = null
-            this.geometries = {}
-        },
         updateGeometries(geometries) {
             this.geometries = geometries
         },
@@ -65,7 +52,7 @@ export const useAnswerMapViewStore = defineStore('answerMapView', {
         updateLocation(location) {
             this.location = location
         },
-        async createLocations() {
+        async createLocations(){
             /**
              * Creates locations using the geometries in state.geometries
              * 
@@ -73,63 +60,54 @@ export const useAnswerMapViewStore = defineStore('answerMapView', {
              */
             // create the location collection, if there are geometries
             if (Object.keys(this.geometries).length !== 0) {
-                const { data, error, pending } = await useAsyncData(() => $cmsApi(`/locations/`,
-                    {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: {
-                            name: this.name,
-                            description: this.description,
-                        }
+                const {data, error, pending } = await useAsyncData( () => $cmsApi(`/locations/`, 
+                    { method: 'POST', 
+                      headers: {'Content-Type': 'application/json'},
+                      body: {
+                        name: this.name, 
+                        description: this.description,
+                    } 
                     }
                 ));
 
                 if (data.value) {
-                    this.location = data.value.url
-                }
+                    this.location =  data.value.url
+                    // console.log('location_url //> ', data)
+                } 
 
                 if (error.value) {
                     throw new Error('Error creating location collection //> ', error.value)
                 }
-
+                
                 // Create the geometries and add them to the location collection
-                for (const feature of this.geometries.features) {
+                this.geometries.features.forEach( async (feature) => {
 
-                    let feature_endpoint;
-                    if (feature.geometry.type === "Point") {
-                        feature_endpoint = `/pointfeatures/`;
+                    var feature_endpoint;
+                    if (feature.geometry.type === "Point"){
+                        feature_endpoint = `/pointfeatures/`;    
                     } else if (feature.geometry.type === "LineString") {
-                        feature_endpoint = `/linefeatures/`;
+                        feature_endpoint = `/linefeatures/`;    
                     } else if (feature.geometry.type === "Polygon") {
                         feature_endpoint = `/polygonfeatures/`
                     } else {
                         throw new Error('Unsupported geometry type //> ', feature.geometry.type)
                     }
 
-                    try {
-
-                        const { data, error, pending } = await useAsyncData(`create-feature-${Math.random()}`, () => $cmsApi(feature_endpoint,
-                            {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: {
-                                    geom: feature.geometry,
-                                    annotation: feature.properties?.annotation || '',
-                                    location: this.location
-                                }
-                            }
-                        ));
-
-                        if (error.value) {
-                            console.error(`Error creating feature of type ${feature.geometry.type} //> `, error.value)
-                            throw new Error('Error creating feature //> ', error.value)
+                    const {data, error, pending } = await useAsyncData( () => $cmsApi(feature_endpoint, 
+                        { method: 'POST', 
+                          headers: {'Content-Type': 'application/json'}, 
+                          body: {
+                            geom: feature.geometry,
+                            description: 'created from mapview store',
+                            location: this.location
+                        } 
                         }
-                        console.log(`Successfully created ${feature.geometry.type} feature`)
-                    } catch (error) {
-                        console.error('Error in creating feature: ', error)
-                        throw error;
+                    ));
+
+                    if (error.value) {
+                        throw new Error('Error creating feature //> ', error.value)
                     }
-                }
+                })
 
             } else {
                 this.location = null
@@ -137,7 +115,7 @@ export const useAnswerMapViewStore = defineStore('answerMapView', {
             return this.location
 
         },
-        async updateLocations() {
+        async updateLocations(){
             /**
              * Updates locations using the geometries in state.geometries
              * 
@@ -145,34 +123,34 @@ export const useAnswerMapViewStore = defineStore('answerMapView', {
              */
             // create the location collection, if there are geometries
 
-            for (const feature of this.geometries.features) {
-                let feature_endpoint;
-                if (feature.geometry.type === "Point") {
-                    feature_endpoint = `/pointfeatures/`;
+            this.geometries.features.forEach( async (feature) => {
+
+                var feature_endpoint;
+                if (feature.geometry.type === "Point"){
+                    feature_endpoint = `/pointfeatures/`;    
                 } else if (feature.geometry.type === "LineString") {
-                    feature_endpoint = `/linefeatures/`;
+                    feature_endpoint = `/linefeatures/`;    
                 } else if (feature.geometry.type === "Polygon") {
                     feature_endpoint = `/polygonfeatures/`
                 } else {
                     throw new Error('Unsupported geometry type //> ', feature.geometry.type)
                 }
 
-                const { data, error } = await useAsyncData(`update-feature-${Math.random()}`, () => $cmsApi(feature_endpoint,
-                    {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: {
-                            geom: feature.geometry,
-                            annotation: feature.properties?.annotation || '',
-                            location: this.location
-                        }
+                const {data, error, pending } = await useAsyncData( () => $cmsApi(feature_endpoint, 
+                    { method: 'PUT', 
+                    headers: {'Content-Type': 'application/json'}, 
+                    body: {
+                        geom: feature.geometry,
+                        annotation: 'created from mapview store',
+                        location: this.location
+                    } 
                     }
                 ));
 
                 if (error.value) {
-                    throw new Error('Error updating feature //> ', error.value)
+                    throw new Error('Error creating feature //> ', error.value)
                 }
-            }
+            })
 
             return this.location
         },
@@ -183,21 +161,20 @@ export const useAnswerMapViewStore = defineStore('answerMapView', {
              */
             // const csrftoken = user.getCookie('csrftoken');
             // var location_url;
-
+            
             const location_url = await this.createLocations();
-
-            const config = setRequestConfig({
-                method: 'POST', headers: {
-                    'Content-Type': 'application/json'
-                }, body: {
-                    name: this.name,
-                    map_service_url: this.mapServiceUrl,
-                    options: {
-                        zoom: this.zoomLevel,
-                        center: this.center
-                    },
-                    location: location_url
-                }
+    
+            const config = setRequestConfig({ method: 'POST', headers:{
+                'Content-Type': 'application/json'
+             }, body: {
+                name: this.name,
+                map_service_url: this.mapServiceUrl,
+                options: {
+                    zoom: this.zoomLevel,
+                    center: this.center
+                },
+                location: location_url
+             } 
             })
 
             const global = useGlobalStore()
@@ -216,7 +193,7 @@ export const useAnswerMapViewStore = defineStore('answerMapView', {
 
             if (data.value) {
                 this.id = data.value.id
-                this.url = data.value.url
+                this.url = data.value.url               
             }
 
             // Notification
@@ -226,8 +203,7 @@ export const useAnswerMapViewStore = defineStore('answerMapView', {
         async updateMapview(mapview_url) {
             const global = useGlobalStore()
             // console.log('mapview url at store //> ', mapview_url)
-            const config = setRequestConfig({
-                method: 'PATCH',
+            const config = setRequestConfig({ method: 'PATCH', 
                 body: {
                     name: this.name,
                     map_service_url: this.mapServiceUrl,
@@ -236,12 +212,12 @@ export const useAnswerMapViewStore = defineStore('answerMapView', {
                         center: this.center
                     },
                     location: this.location,
-                }
-            })
+                 } 
+             })
 
             // CONTINUE HERE, approach the issue of updating the location starting from here the updateMapview (below). Update the mapview instead of updating the location if possible.
-            // TODO: modify to update locations and geometries
-            const { data, error, refresh } = await useAsyncData(() => $cmsApi(`${mapview_url}`, config));
+             // TODO: modify to update locations and geometries
+            const { data, error, refresh } = await useAsyncData( () => $cmsApi(`${mapview_url}`, config));
 
             if (error.value) {
                 let warnMessage = null
@@ -260,12 +236,12 @@ export const useAnswerMapViewStore = defineStore('answerMapView', {
         async fetchMapView(url) {
             // console.log('Map_view id //> ', url)
             const config = setRequestConfig({ method: 'GET' })
-            const { data: res, error } = await useAsyncData(() => $cmsApi(`${url}`, config));
+            const {data: res, error } = await useAsyncData( () => $cmsApi(`${url}`, config));
 
             //  console.log('Map_view res //> ', res)
             if (res?.value) {
                 this.id = res.value.id;
-                this.url = res.value.url;
+                this.url= res.value.url;
                 this.name = res.value.name;
                 this.mapServiceUrl = res.value.map_service_url;
                 // console.log('res.value.options.zoom //> ', res.value.options.zoom)
