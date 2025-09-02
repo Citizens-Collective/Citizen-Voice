@@ -16,16 +16,10 @@ export const useSurveyStore = defineStore('survey', {
             return this.questions.length
         },
         getMapViewUrl(index) {
-            return this.questions[index].mapview
+            return this.questions[index].map_view
         }
     },
     actions: {
-        $reset() {
-            this.selectedSurveyId = null
-            this.currentSurveyDesign = []
-            this.questions = []
-        },
-
         async getSurvey(suvery_url) {
             const user = useUserStore()
             const token = user.getAuthToken
@@ -46,7 +40,7 @@ export const useSurveyStore = defineStore('survey', {
 
             return data
         },
-
+        
         selectSurvey(id) {
             this.selectedSurveyId = id
         },
@@ -66,7 +60,7 @@ export const useSurveyStore = defineStore('survey', {
             if (token) {
                 config.headers['Authorization'] = `Token ${token}`
             }
-            const { data, error } = await useAsyncData('surveys', () => $cmsApi('/surveys', config));
+            const { data, error} = await useAsyncData('surveys', () => $cmsApi('/surveys', config));
 
             return { data, error }
         },
@@ -126,7 +120,7 @@ export const useSurveyStore = defineStore('survey', {
                 return null
 
             }
-
+           
             if (register?.value) {
                 // Notification
                 global.succes('createSurvey complete')
@@ -262,20 +256,20 @@ export const useSurveyStore = defineStore('survey', {
             const id = this.selectedSurveyId
             // console.log('id in get questions//> ', id);
 
-            // Use unique cache key per survey to prevent loading cached questions from wrong survey
-            const { data: response, pending, error } = await useAsyncData(`survey-${id}-questions`, () => $cmsApi('/surveys/' + id + '/questions', config));
+            // if (!this.questions){
+                const { data: response, pending, error} = await useAsyncData(() => $cmsApi('/surveys/' + id + '/questions', config));
+            
+                const responseData = await response.value;  
 
-            const responseData = await response.value;
-
-
-            this.questions = responseData;
-            // console.log('Questions //> ', responseData);
+                 
+                this.questions = responseData;
+                // console.log('Questions //> ', responseData);
             // }
 
-            if (error.value) {
+              if (error.value){
                 console.log('error in get questions //> ', error.value);
-            };
-
+              };
+            
             return responseData;
         },
     }

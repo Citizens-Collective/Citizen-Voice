@@ -18,7 +18,7 @@
       <!-- Upload button -->
       <v-btn
         v-if="selectedFile && !uploading"
-        @click="ensureResponseAndUpload"
+        @click="uploadImage"
         color="primary"
         :loading="uploading"
         class="mt-2"
@@ -86,7 +86,6 @@ export default {
 
 import { useSurveyStore } from '~/stores/survey'
 import { useResponseStore } from '~/stores/response';
-import { en } from 'vuetify/locale';
 
 const surveyStore = useSurveyStore();
 const responseStore = useResponseStore();
@@ -122,54 +121,29 @@ const fileRules = [
   }
 ]
 
+const current_question_index = router.currentRoute.value.params._question - 1; // Adjusting to zero-based index
+
 
 // Handle file selection
-function handleFileSelect(files) {
-  console.log('File selection event:', files, typeof files);
-  
-  // Extract the actual file object
-  let file = null;
-  
-  if (Array.isArray(files) && files.length > 0) {
-    // v-file-input sometimes passes an array
-    file = files[0];
-  } else if (files instanceof File) {
-    // Direct File object
-    file = files;
-  } else {
-    // No valid file
-    preview.value = null;
-    return;
+function handleFileSelect(file) {
+  if (!file) {
+    preview.value = null
+    return
   }
-  
-  // Validate that we have a proper File object
-  if (!(file instanceof File)) {
-    console.error('Invalid file object:', file);
-    preview.value = null;
-    return;
-  }
-  
-  console.log('Processing file:', file.name, file.type, file.size);
   
   // Create preview
-  const reader = new FileReader();
+  const reader = new FileReader()
   reader.onload = (e) => {
-    preview.value = e.target.result;
-  };
-  reader.onerror = (e) => {
-    console.error('FileReader error:', e);
-    errorMessage.value = 'Failed to read file';
-  };
-  
-  reader.readAsDataURL(file);
+    preview.value = e.target.result
+  }
+  reader.readAsDataURL(file)
 }
 
-
-// Add this method before uploadImage()
-async function ensureResponseAndUpload() {
+// Upload image to the server
+async function uploadImage() {
   if (!selectedFile.value) return
   
-  // Validate file first
+  // Validate file
   const validation = fileRules[0](selectedFile.value)
   if (validation !== true) {
     errorMessage.value = validation
@@ -180,51 +154,23 @@ async function ensureResponseAndUpload() {
   errorMessage.value = null
   
   try {
-    // 1. Ensure response exists by directly calling ensureResponseExists
-    await responseStore.ensureResponseExists()
-    
-    // 2. Check if we have a response URL now
-    if (!responseStore.responseUrl) {
-      throw new Error('Failed to create response - no response URL available')
-    }
-    
-    console.log('Response exists, URL:', responseStore.responseUrl)
-    
-    // 3. Now proceed with the upload
-    await uploadImage()
-    
-  } catch (error) {
-    console.error('Upload preparation failed:', error)
-    errorMessage.value = error.message || 'Failed to prepare upload. Please try again.'
-    uploading.value = false
-  }
-}
-
-
-// Upload image to the server
-async function uploadImage() {
-  try {
-    console.log('Question object:', props.question);
-    console.log('Answer object:', props.answer);
-    
     // Create FormData for the upload
     const formData = new FormData()
-    formData.append('question', props.question.url)
+    formData.append('question', props.question.url) // Use question URL as expected by your API
     formData.append('image', selectedFile.value)
-    formData.append('response', responseStore.responseUrl)
-    
-    // Handle mapview - only append if it exists and is valid
-    const mapviewUrl = props.answer?.mapview?.url || props.question?.mapview;
-    if (mapviewUrl && mapviewUrl.trim() !== '' && mapviewUrl !== 'null') {
-      console.log('Adding mapview to form:', mapviewUrl);
-      formData.append('mapview', mapviewUrl);
-    } else {
-      console.log('No mapview provided - field will be null');
-    }
+    formData.append('response', responseStore.responseUrl) // Use the response URL from the store
+    formData.append('mapview', null)
 
-    console.log('responseurl', responseStore.responseUrl)
+    console.log( 'responseurl', responseStore.responseUrl)
     
-    // Make API call to upload image
+    // If you have a response ID, include it
+    if (props.answer.response) {
+      formData.append('response', props.answer.response)
+    }
+    
+      // Make API call to upload image
+    
+    //TODO: CONTINUE HERE Replace this call with a call that includes the actual question url, response url and  mapview value (should be null)
     const response = await $cmsApi('/answers/upload_image_answer/', {
       method: 'POST',
       body: formData

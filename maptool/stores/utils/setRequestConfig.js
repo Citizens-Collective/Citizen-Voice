@@ -7,14 +7,10 @@ const setRequestConfig = (params = { method: "GET" }) => {
 
     const config = {
         headers: {
+            'Content-Type': 'application/json',
             'X-CSRFToken': csrftoken
         },
         ...params,
-    }
-
-    // Only set Content-Type for JSON if body is not FormData
-    if (params.body && !(params.body instanceof FormData)) {
-        config.headers['Content-Type'] = 'application/json';
     }
 
     if (token) {
