@@ -49,23 +49,23 @@ def patch_viewset_class(cls):
     if not hasattr(cls.list, '_spectacular_annotation'):
         cls.list = create_method_with_schema(
             cls.list,
-            f"List {model_name}s",
-            f"Retrieve a list of all {model_name}s in the database.",
-            f"list{model_name}s"
+            f"Lists {model_name}s",
+            f"Retrieves all {model_name}s.",
+            f"listing{model_name}s"
         )
     
     if not hasattr(cls.create, '_spectacular_annotation'):
         cls.create = create_method_with_schema(
             cls.create,
-            f"Create a {model_name}",
-            f"Create a new {model_name} in the database.",
+            f"Create a new {model_name}",
+            f"Create a new {model_name}.",
             f"create{model_name}"
         )
     
     if not hasattr(cls.retrieve, '_spectacular_annotation'):
         cls.retrieve = create_method_with_schema(
             cls.retrieve,
-            f"Retrieve a {model_name}",
+            f"Retrieve a spesific {model_name}",
             f"Retrieve a specific {model_name} by its ID.",
             f"retrieve{model_name}"
         )
@@ -73,7 +73,7 @@ def patch_viewset_class(cls):
     if not hasattr(cls.update, '_spectacular_annotation'):
         cls.update = create_method_with_schema(
             cls.update,
-            f"Update a {model_name}",
+            f"Update a spesific {model_name}",
             f"Update a specific {model_name} by its ID.",
             f"update{model_name}"
         )
@@ -81,7 +81,7 @@ def patch_viewset_class(cls):
     if not hasattr(cls.partial_update, '_spectacular_annotation'):
         cls.partial_update = create_method_with_schema(
             cls.partial_update,
-            f"Partially update a {model_name}",
+            f"Partially update a specific {model_name}",
             f"Partially update a specific {model_name} by its ID.",
             f"partialUpdate{model_name}"
         )
@@ -89,7 +89,7 @@ def patch_viewset_class(cls):
     if not hasattr(cls.destroy, '_spectacular_annotation'):
         cls.destroy = create_method_with_schema(
             cls.destroy,
-            f"Delete a {model_name}",
+            f"Delete a specific {model_name}",
             f"Delete a specific {model_name} by its ID.",
             f"delete{model_name}"
         )
